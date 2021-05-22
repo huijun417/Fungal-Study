@@ -1,0 +1,363 @@
+---
+title: "Water Potential"
+author: "Huijun Hao"
+date: "5/18/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+Water_potential <- read_excel("L:/homework/STAT183/individual project/Fungal Study.xls", sheet = "Water Potential", skip = 3)
+Sucrose <- data.frame("Trials" = Water_potential$Trial...1, "MPa" = Water_potential$MPa...2, "Rep" = Water_potential$Rep...3, "Diameter" = Water_potential$`Diameter (cm)...4`)
+KCl <- data.frame("Trials" = Water_potential$Trial...6, "MPa" = Water_potential$MPa...7, "Rep" = Water_potential$Rep...8, "Diameter" = Water_potential$`Diameter (cm)...9`)
+NaCl <- data.frame("Trials" = Water_potential$Trial...11, "MPa" = Water_potential$MPa...12, "Rep" = Water_potential$Rep...13, "Diameter" = Water_potential$`Diameter (cm)...14`)
+Glycerol <- data.frame("Trials" = Water_potential$Trial...16, "MPa" = Water_potential$MPa...17, "Rep" = Water_potential$Rep...18, "Diameter" = Water_potential$`Diameter (cm)...19`)
+```
+
+```{r}
+#anova to test trial effect in Sucrose
+Sucrose.factor <- as.factor(Sucrose$MPa)
+trial.sucrose <- as.factor(Sucrose$Trials)
+anova.sucrose <- aov(Sucrose$Diameter ~ trial.sucrose + Sucrose.factor)
+summary(anova.sucrose)
+#There is a significant trials effect and MPa effect
+
+#residuals plot
+par(mfrow=c(2,2))
+plot(anova.sucrose)
+
+#residuals analysis
+shapiro.test(anova.sucrose$residuals)
+TSA::runs(anova.sucrose$residuals)
+
+#normailty and constant variance assumptions are violated
+```
+
+
+```{r}
+#Since there is a trial effect in sucrose experiment, build seperated models for different trials and compare with the simple model
+reg.sucrose.1 <- lm(subset(Sucrose, Sucrose$Trials == 1)$Diameter ~ subset(Sucrose, Sucrose$Trials == 1)$MPa)
+anova(reg.sucrose.1)
+reg.sucrose.2 <- lm(subset(Sucrose, Sucrose$Trials == 2)$Diameter ~ subset(Sucrose, Sucrose$Trials == 2)$MPa)
+anova(reg.sucrose.2)
+
+
+#MPa effect on fungus diameter
+reg.sucrose <- lm(Sucrose$Diameter ~ Sucrose$MPa)
+anova(reg.sucrose)
+
+#F test to test if there is an improvement between simple model and complex model
+#Ho: yi = beta0 + beta1*xi
+#Ha: yij = beta0ij + beta1ij*xij
+F.ts = ((15.42- 7.198 - 6.815)/2)/((6.815+7.198)/(48-4))
+pf(F.ts, 2, 44, lower.tail = FALSE)
+#P-value = 0.1219 > 0.05. reject Ho. There is insufficient evidence to indicate that there is an improvement in residuals.
+#Use the simple regression 
+```
+
+```{r}
+#model parameters
+summary(reg.sucrose)
+
+#plot with curve
+plot(Sucrose$MPa, Sucrose$Diameter, xlab = "Sucrose concentration", ylab = "Diameter", main = "Sucrose concentration vs Diameter")
+curve(expr = reg.sucrose$coefficients[1]+
+             reg.sucrose$coefficients[2]*x,
+              add = TRUE)
+#residuals analysis
+par(mfrow=c(2,2))
+hist(reg.sucrose$residuals)
+plot(reg.sucrose$fitted.values, reg.sucrose$residuals)
+abline(h = 0, col = "red")
+qqnorm(reg.sucrose$residuals)
+#residuals test
+shapiro.test(reg.sucrose$residuals)
+car::ncvTest(reg.sucrose)
+TSA::runs(reg.sucrose$residuals)
+#independent test fail
+```
+
+```{r}
+#transformation sicrose
+t.sucrose <- -1*Sucrose$MPa
+MASS::boxcox((Sucrose$Diameter+0.1) ~ t.sucrose)
+tf.sucrose <- lm((Sucrose$Diameter^0.6)~Sucrose$MPa)
+
+plot(Sucrose$MPa, (Sucrose$Diameter)^0.6)
+curve(expr = tf.sucrose$coefficients[1]+
+             tf.sucrose$coefficients[2]*x,
+              add = TRUE)
+
+#residuals plot
+par(mfrow=c(2,2))
+hist(tf.sucrose$residuals)
+plot(tf.sucrose$fitted.values, tf.sucrose$residuals)
+abline(h = 0, col = "red")
+qqnorm(reg.sucrose$residuals)
+
+#residuals analysis
+shapiro.test(tf.sucrose$residuals)
+car::ncvTest(tf.sucrose)
+TSA::runs(tf.sucrose$residuals)
+#Independent and normailty assumptions for residuals are still violated after transformation
+#use original data instead of transformation
+
+
+#regression equation 
+#Yi = 7.4095 + 1.25291x + ε
+#Diameter of fungus is largest when sucrose concentration is -0.3 MPa. The diameters is decreasing as sucrose concentration decreasing. The diameters reach 0 when Sucrose concentration is -6 MPa. Since diameter cannot be less than 0. It is meaningless to interpert when MPa is lower than -6
+```
+
+```{r}
+#Anova table to test trial effect in KCl experiment
+anova.kcl <- aov(KCl$Diameter~ as.factor(KCl$Trials) + as.factor(KCl$MPa))
+summary(anova.kcl)
+#There is significiant trials and MPa effect
+
+#residuals analysis
+par(mfrow=c(2,2))
+plot(anova.kcl)
+
+#residuals test
+shapiro.test(anova.kcl$residuals)
+TSA::runs(anova.kcl$residuals)
+
+#normality and independent assumptions are violated 
+```
+
+```{r}
+#Since there is a trial effect in KCl experiment, build seperated models for different trials and compare with the simple model
+plot(KCl$MPa,KCl$Diameter, xlab = "KCl concentration", ylab = "Diameter", main = "Diameter vs KCl concentration")
+#the plot suggest that there is a quadratic linear realtionship
+#simple model
+kcl2 <- KCl$MPa^2
+reg.kcl <- lm(KCl$Diameter~KCl$MPa + kcl2)
+anova(reg.kcl)
+#complete model
+c.kcl2 <- subset(KCl, KCl$Trials == 1)$MPa^2
+#complete model
+reg.kcl.1 <- lm(subset(KCl, KCl$Trials == 1)$Diameter ~ subset(KCl, KCl$Trials == 1)$MPa + c.kcl2)
+anova(reg.kcl.1)
+reg.kcl.2 <- lm(subset(KCl, KCl$Trials == 2)$Diameter ~ subset(KCl, KCl$Trials == 2)$MPa + c.kcl2)
+anova(reg.kcl.2)
+#F test
+kcl.fts <- ((9.75-3.963-5.341)/2)/((3.963+5.341)/44)
+pf(kcl.fts, 2, 44, lower.tail = FALSE)
+```
+
+
+
+
+```{r}
+# regression for KCl experiment
+kcl2 <- KCl$MPa^2
+reg.kcl <- lm(KCl$Diameter~KCl$MPa + kcl2)
+summary(reg.kcl)
+
+plot(KCl$MPa,KCl$Diameter, xlab = "KCl concentration", ylab = "Diameter", main = "Diameter vs KCl concentration")
+curve(expr = reg.kcl$coefficients[1]+
+             reg.kcl$coefficients[2]*x+
+             reg.kcl$coefficients[3]*x^2,
+              add = TRUE)
+
+#residuals aplot
+par(mfrow=c(2,2))
+hist(reg.kcl$residuals)
+plot(reg.kcl$fitted.values, reg.kcl$residuals)
+abline(h = 0, col = "red")
+qqnorm(reg.kcl$residuals)
+
+#residuals analysis
+shapiro.test(reg.kcl$residuals)
+car::ncvTest(reg.kcl)
+TSA::runs(reg.kcl$residuals)
+
+#Constant variance and independent assumptions are violated at alpha = 0.5 but not at alpha = 0.01
+```
+
+```{r}
+#KCl transformation
+t.kcl <- -1*KCl$MPa
+MASS::boxcox((KCl$Diameter+0.1) ~ t.kcl)
+tf.kcl <- lm((KCl$Diameter^0.25)~KCl$MPa + kcl2)
+summary(tf.kcl)
+
+plot(KCl$MPa, (KCl$Diameter)^0.25)
+curve(expr = tf.kcl$coefficients[1]+
+             tf.kcl$coefficients[2]*x+
+             tf.kcl$coefficients[3]*x^2,
+              add = TRUE)
+
+#residuals plot
+par(mfrow=c(2,2))
+hist(tf.kcl$residuals)
+plot(tf.kcl$fitted.values， tf.kcl$residuals)
+abline(h = 0, col = "red")
+qqnorm(tf.kcl$residuals)
+
+#residuals analysis
+shapiro.test(tf.kcl$residuals)
+car::ncvTest(tf.kcl)
+TSA::runs(tf.kcl$residuals)
+
+#independent assumption is violated
+#All assumptions for model with original data are all satisified when alpha = 0.01
+#Independent assumption for model after transformation is violated even if alpha = 0.01
+#Use the regression model with original data
+
+#regression model
+# Yi = 8.41908 + 2.72784x + 0.2285x^2 + ε
+#Diameter of fungus is largest when KCl concentration is -0.3 MPa. The diameters is decreasing as KCl concentration decreasing. The diameters reach 0 when KCl concentration is -6 MPa. Since diameter cannot be less than 0. It is meaningless to interpert when MPa is lower than -6
+```
+
+```{r}
+#NaCl experiment
+plot(NaCl$MPa, NaCl$Diameter, xlab = "NaCl concentration", ylab = "Diameter", main = "NaCl concentration vs Diameter")
+#Anova tabale to test trial effect in NaCl experiment
+anova.nacl <- aov(NaCl$Diameter ~ as.factor(NaCl$Trials) + as.factor(NaCl$MPa))
+summary(anova.nacl)
+#P-values suggests that there is both significant trials and MPa effect. 
+
+#residuals test
+shapiro.test(anova.nacl$residuals)
+TSA::runs(anova.nacl$residuals)
+#Normailty assumption is violated
+```
+
+```{r}
+#Since there is a trial effect in NaCl experiment, build seperated models for different trials and compare with the simple model
+#The plot suggests that there is a quadratic relationship
+nacl1.map2 <- subset(NaCl, NaCl$Trials == 1)$MPa^2
+reg.nacl.1 <- lm(subset(NaCl, NaCl$Trials == 1)$Diameter ~ subset(NaCl, NaCl$Trials == 1)$MPa + nacl1.map2)
+anova(reg.nacl.1)
+reg.nacl.2 <- lm(subset(NaCl, NaCl$Trials == 2)$Diameter ~ subset(NaCl, NaCl$Trials == 2)$MPa + nacl1.map2)
+anova(reg.nacl.2)
+
+
+#MPa effect on fungus diameter
+nacl.map2 <- NaCl$MPa^2
+reg.nacl <- lm(NaCl$Diameter ~ NaCl$MPa + nacl.map2)
+anova(reg.nacl)
+#F test to test if there is an improvement between simple model and complex model
+#Ho: yi = beta0 + beta1*xi + beta2*xi^2 + ε
+#Ha: yij = beta0ij + beta1ij*xij + beta2ij*xi^2 + ε
+F.nacl = ((15.16 - 8.713 - 5.875)/3)/((8.713 + 5.875)/(48-6))
+pf(F.nacl, 2, 44)
+#P-value = 0.4185368 > 0.05. reject Ho. The complex models do not have significant improvement in residuals.
+#Use the simple model
+```
+
+```{r}
+#residuals plot
+par(mfrow=c(2,2))
+hist(reg.nacl$residuals)
+plot(reg.nacl$fitted.values, reg.nacl$residuals)
+abline(h = 0, col = "red")
+qqnorm(reg.nacl$residuals)
+
+#residuals analysis
+shapiro.test(reg.nacl$residuals)
+car::ncvTest(reg.nacl)
+TSA::runs(reg.nacl$residuals)
+#constant variance and independent assumptions are violated
+```
+
+```{r}
+#NaCl transformation
+t.nacl <- -1*NaCl$MPa
+MASS::boxcox((NaCl$Diameter+0.1) ~ t.nacl)
+#boxcox transformation suggests that lambda could be 0.25
+mpa.square <- KCl$MPa^2
+tf.nacl <- lm((NaCl$Diameter^0.25)~NaCl$MPa + mpa.square)
+#summary(tf.kcl)
+
+plot(NaCl$MPa, (NaCl$Diameter)^0.35, xlab = "NaCl concentration", ylab = "Diameter after transformation", main = "NaCl concentration vs Diameters after transformation")
+curve(expr = tf.nacl$coefficients[1]+
+             tf.nacl$coefficients[2]*x+
+             tf.nacl$coefficients[3]*x^2,
+              add = TRUE)
+
+#residuals plot
+par(mfrow=c(2,2))
+hist(tf.nacl$residuals)
+plot(tf.nacl$fitted.values, tf.nacl$residuals)
+abline(h = 0, col = "red")
+qqnorm(tf.nacl$residuals)
+
+#residuals analysis
+shapiro.test(tf.nacl$residuals)
+car::ncvTest(tf.nacl)
+TSA::runs(tf.nacl$residuals)
+#only independent assumption is violated after transformation, which is better than the regression with the original data
+
+summary(tf.nacl)
+#  Yi = (1.594553 - 0.005160x - 0.039691x^2 + ε)^4
+#Diameter of fungus is largest when NaCl concentration is -0.3 MPa. The diameters is decreasing as NaCl concentration decreasing. The diameters reach 0 when NaCl concentration is -6 MPa. Since diameter cannot be less than 0. It is meaningless to interpert when MPa is lower than -6
+```
+
+
+```{r}
+plot(Glycerol$MPa, Glycerol$Diameter, xlab = "Glycerol concentration", ylab = "Diameter", main = "Diameter vs Glycerol concentration")
+#since diameter of fungus is 0 when glycerol concentration is -4.3 MPa, it is meaningless to interprete fungus' diameters when glycerol concentration is less than -4.3 MPa. 
+#removed the observations when glycerol concentration is -6.3 MPa.
+new.glycerol <- subset(Glycerol, Glycerol$MPa != -6.3)
+
+#Anova table to test trials and glycerol effect
+anova.g <- aov(new.glycerol$Diameter~ as.factor(new.glycerol$Trials) + as.factor(new.glycerol$MPa))
+summary(anova.g)
+#P-values suggest that trial effect is not significant but concentration effect is significant
+
+#residuals analysis
+par(mfrow=c(2,2))
+plot(anova.g)
+
+#residuals test
+shapiro.test(anova.g$residuals)
+TSA::runs(anova.g$residuals)
+
+#normality assumption is violated
+```
+
+```{r}
+#linear regression for glycerol vs diameter when -6 MPa is removed
+MPa.sq <- new.glycerol$MPa
+reg.g <- lm(new.glycerol$Diameter ~ MPa.sq)
+plot(Glycerol$MPa, Glycerol$Diameter,  xlab = "Glycerol concentration", ylab = "Diameter", main = "daimeter vs Glycerol concentration")
+curve(expr = reg.g$coefficients[1]+
+             reg.g$coefficients[2]*x,
+              add = TRUE)
+
+#residuals plots
+par(mfrow=c(2,2))
+hist(reg.g$residuals)
+plot(reg.g$fitted.values, reg.g$residuals)
+abline(h = 0, col = "red")
+qqnorm(reg.g$residuals)
+#residuals analysis
+shapiro.test(reg.g$residuals)
+car::ncvTest(reg.g)
+TSA::runs(reg.g$residuals)
+#constant variance and normality assumption is violated
+```
+
+```{r}
+#transformation
+t.g <- -1*new.glycerol$MPa
+MASS::boxcox((new.glycerol$Diameter+0.1) ~ t.g)
+#boxcox transformation suggests that lambda could be 1. 
+#No transformation is needed 
+#violation of constant variance is accepted since all observations at Mpa - 4.3 are 0.
+#p-value of shaprio test for original data's residuals descreases as higher power terms are added to the regression
+#Chose the linear regression model with the original data
+
+summary(reg.g)
+#Yi = 8.0535 + 1.84500*xi + ε
+#Diameter of fungus is largest when glycerol concentration is -0.3 MPa. The diameters is decreasing as glycerol concentration decreasing. The diameters reach 0 when glycerol concentration is leass than -4.3 MPa. Since diameter cannot be less than 0. It is meaningless to interpert when MPa is lower than -4.3
+
+
+```
+
